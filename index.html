@@ -15,6 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
 <style>
 /* ============================================================
@@ -177,7 +178,16 @@ button{font-family:inherit;}
 }
 @media(min-width:1024px){
   .lg\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .lg\:grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr));}
+  .lg\:col-span-4{grid-column:span 4 / span 4;}
 }
+@media(min-width:768px){
+  .md\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+.col-span-2{grid-column:span 2 / span 2;}
+.col-span-3{grid-column:span 3 / span 3;}
+.max-h-96{max-height:24rem;}
+.overflow-y-auto{overflow-y:auto;}
 
 /* KD DESIGN signature: cadre à coins dorés lumineux */
 .kd-frame{
@@ -1111,11 +1121,17 @@ async function renderAdmin(main) {
   const owner = isOwner(currentUser.email);
 
   main.innerHTML = `<div class="max-w-5xl mx-auto px-5 py-14">
-    <h1 class="font-display text-2xl font-bold">Espace admin</h1>
-    <p class="text-sm text-bone/55 mt-1">${esc(currentUser.email)} ${owner ? '· propriétaire' : '· associé'}</p>
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="font-display text-2xl font-bold">Espace admin</h1>
+        <p class="text-sm text-bone/55 mt-1">${esc(currentUser.email)} ${owner ? '· propriétaire' : '· associé'}</p>
+      </div>
+      <button id="shareSiteBtn" class="kd-btn-secondary">📤 Partager le site</button>
+    </div>
     <div class="flex flex-wrap gap-2 mt-6" id="adminTabs">
       <button class="tab-btn" data-tab="commandes">Commandes</button>
       <button class="tab-btn" data-tab="stats">Statistiques</button>
+      <button class="tab-btn" data-tab="historique">Historique</button>
       <button class="tab-btn" data-tab="produits">Produits & services</button>
       <button class="tab-btn" data-tab="paiements">Moyens de paiement</button>
       <button class="tab-btn" data-tab="contacts">Contacts</button>
@@ -1123,6 +1139,9 @@ async function renderAdmin(main) {
     </div>
     <div id="adminContent" class="mt-6">Chargement…</div>
   </div>`;
+
+  const shareBtn = document.getElementById('shareSiteBtn');
+  if (shareBtn) shareBtn.onclick = shareSite;
 
   document.querySelectorAll('#adminTabs .tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === adminTab);
@@ -1132,10 +1151,38 @@ async function renderAdmin(main) {
   const content = document.getElementById('adminContent');
   if (adminTab === 'commandes') return renderAdminOrders(content);
   if (adminTab === 'stats') return renderAdminStats(content);
+  if (adminTab === 'historique') return renderAdminHistory(content);
   if (adminTab === 'produits') return renderAdminProducts(content);
   if (adminTab === 'paiements') return renderAdminPayments(content);
   if (adminTab === 'contacts') return renderAdminContacts(content);
   if (adminTab === 'associes' && owner) return renderAdminAssociates(content);
+}
+
+// ---------- PARTAGE DU SITE (lien + logo) ----------
+async function shareSite() {
+  const url = window.location.origin + window.location.pathname;
+  const text = 'Découvrez KD DESIGN — logos, affiches, montage vidéo, sites web et plus encore, à des prix pensés pour les entrepreneurs d\'ici.';
+  try {
+    if (navigator.canShare && typeof KD_LOGO_IMAGE !== 'undefined') {
+      const res = await fetch(KD_LOGO_IMAGE);
+      const blob = await res.blob();
+      const file = new File([blob], 'kd-design-logo.jpg', { type: blob.type || 'image/jpeg' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'KD DESIGN', text: `${text}\n${url}` });
+        return;
+      }
+    }
+    if (navigator.share) {
+      await navigator.share({ title: 'KD DESIGN', text, url });
+      return;
+    }
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    alert('Lien et présentation copiés dans le presse-papiers !');
+  } catch (e) {
+    if (e && e.name !== 'AbortError') {
+      try { await navigator.clipboard.writeText(`${text}\n${url}`); alert('Lien copié dans le presse-papiers !'); } catch (_) {}
+    }
+  }
 }
 
 async function renderAdminOrders(content) {
@@ -1226,7 +1273,7 @@ async function renderAdminOrders(content) {
 
 async function renderAdminStats(content) {
   content.innerHTML = `<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">Chargement…</div>`;
-  const { data: orders } = await sb.from('orders').select('status');
+  const { data: orders } = await sb.from('orders').select('status, price, created_at');
   const { count: visitsCount } = await sb.from('site_visits').select('*', { count: 'exact', head: true });
   const { count: loginsCount } = await sb.from('logins').select('*', { count: 'exact', head: true });
 
@@ -1234,6 +1281,7 @@ async function renderAdminStats(content) {
   const enAttente = orders?.filter(o => o.status === 'nouvelle' || o.status === 'en_cours').length || 0;
   const livrees = orders?.filter(o => o.status === 'livree').length || 0;
   const annulees = orders?.filter(o => o.status === 'annulee').length || 0;
+  const totalVentes = orders?.filter(o => o.status !== 'annulee').reduce((sum, o) => sum + Number(o.price || 0), 0) || 0;
 
   content.innerHTML = `<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
     <div class="stat-card"><div class="num">${total}</div><div class="lbl">Commandes totales</div></div>
@@ -1242,7 +1290,89 @@ async function renderAdminStats(content) {
     <div class="stat-card"><div class="num">${annulees}</div><div class="lbl">Annulées</div></div>
     <div class="stat-card"><div class="num">${visitsCount ?? '—'}</div><div class="lbl">Visites de la plateforme</div></div>
     <div class="stat-card"><div class="num">${loginsCount ?? '—'}</div><div class="lbl">Connexions</div></div>
+    <div class="stat-card col-span-2 lg:col-span-4"><div class="num">${totalVentes.toLocaleString('fr-FR')} FCFA</div><div class="lbl">Ventes totales (hors annulées)</div></div>
+  </div>
+  <div class="kd-frame p-5 mt-6">
+    <p class="font-display font-semibold mb-3">Évolution des commandes et des ventes (30 derniers jours)</p>
+    <canvas id="salesChart" height="220"></canvas>
   </div>`;
+
+  drawSalesChart(orders || []);
+}
+
+let salesChartInstance = null;
+function drawSalesChart(orders) {
+  const canvas = document.getElementById('salesChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  const days = 30;
+  const labels = [];
+  const countsByDay = {};
+  const salesByDay = {};
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now); d.setDate(now.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    labels.push(d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }));
+    countsByDay[key] = 0; salesByDay[key] = 0;
+  }
+  (orders || []).forEach(o => {
+    const key = (o.created_at || '').slice(0, 10);
+    if (key in countsByDay) {
+      countsByDay[key] += 1;
+      if (o.status !== 'annulee') salesByDay[key] += Number(o.price || 0);
+    }
+  });
+  const countsData = Object.values(countsByDay);
+  const salesData = Object.values(salesByDay);
+
+  if (salesChartInstance) salesChartInstance.destroy();
+  salesChartInstance = new Chart(canvas, {
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar', label: 'Commandes', data: countsData, backgroundColor: 'rgba(212,175,55,0.55)', yAxisID: 'y' },
+        { type: 'line', label: 'Ventes (FCFA)', data: salesData, borderColor: '#e0483a', backgroundColor: 'rgba(224,72,58,0.15)', yAxisID: 'y1', tension: 0.3 }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        y: { beginAtZero: true, position: 'left', ticks: { color: '#e8dfce' }, grid: { color: 'rgba(255,255,255,.06)' }, title: { display: true, text: 'Commandes', color: '#e8dfce' } },
+        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#e8dfce' }, title: { display: true, text: 'FCFA', color: '#e8dfce' } },
+        x: { ticks: { color: '#e8dfce', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }, grid: { display: false } }
+      },
+      plugins: { legend: { labels: { color: '#e8dfce' } } }
+    }
+  });
+}
+
+async function renderAdminHistory(content) {
+  content.innerHTML = `<div class="grid md:grid-cols-2 gap-6">
+    <div>
+      <p class="font-display font-semibold mb-3">Dernières visites</p>
+      <div id="visitsList" class="flex flex-col gap-2 max-h-96 overflow-y-auto">Chargement…</div>
+    </div>
+    <div>
+      <p class="font-display font-semibold mb-3">Dernières connexions</p>
+      <div id="loginsList" class="flex flex-col gap-2 max-h-96 overflow-y-auto">Chargement…</div>
+    </div>
+  </div>`;
+
+  const { data: visits } = await sb.from('site_visits').select('*').order('created_at', { ascending: false }).limit(50);
+  const { data: logins } = await sb.from('logins').select('*').order('created_at', { ascending: false }).limit(50);
+
+  document.getElementById('visitsList').innerHTML = (visits || []).map(v => `
+    <div class="flex items-center justify-between border-b border-gold/10 pb-2 text-sm">
+      <span class="text-bone/70">${esc(v.path || '#/')}</span>
+      <span class="font-mono text-xs text-bone/45">${new Date(v.created_at).toLocaleString('fr-FR')}</span>
+    </div>`).join('') || `<p class="text-bone/50 text-sm">Aucune visite enregistrée.</p>`;
+
+  document.getElementById('loginsList').innerHTML = (logins || []).map(l => `
+    <div class="flex items-center justify-between border-b border-gold/10 pb-2 text-sm">
+      <span class="font-mono text-xs text-bone/60">Utilisateur ${esc((l.user_id || '').slice(0, 8))}…</span>
+      <span class="font-mono text-xs text-bone/45">${new Date(l.created_at).toLocaleString('fr-FR')}</span>
+    </div>`).join('') || `<p class="text-bone/50 text-sm">Aucune connexion enregistrée.</p>`;
 }
 
 async function renderAdminProducts(content) {
