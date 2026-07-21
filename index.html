@@ -189,6 +189,7 @@ button{font-family:inherit;}
 .max-h-96{max-height:24rem;}
 .overflow-y-auto{overflow-y:auto;}
 .kd-comic{font-family:'Comic Sans MS','Comic Neue',cursive;}
+.kd-no-anim [data-aos]{opacity:1 !important;transform:none !important;transition:none !important;}
 
 /* KD DESIGN signature: cadre à coins dorés lumineux */
 .kd-frame{
@@ -597,6 +598,35 @@ let PAYMENT_METHODS = DEFAULT_PAYMENT_METHODS;
 let CONTACTS = DEFAULT_CONTACTS;
 let ADMIN_EMAILS = [CONFIG.ADMIN_EMAIL];
 
+// ---------- PARAMÈTRES DU SITE (personnalisables par l'admin) ----------
+const DEFAULT_SITE_SETTINGS = {
+  color_ink: '40,24,18',
+  color_gold: '255,204,77',
+  color_gold_light: '255,230,168',
+  color_crimson: '235,64,73',
+  color_bone: '255,252,247',
+  hero_title_1: 'Des idées',
+  hero_title_2: "à l'image,",
+  hero_title_3: 'des projets à la réussite.',
+  hero_subtitle: "Logos, affiches, montage vidéo, sites web et bien plus — à des prix pensés pour les entrepreneurs d'ici.",
+  whatsapp_number: CONFIG.WHATSAPP_NUMBER,
+  animations_enabled: 'true',
+};
+let SITE_SETTINGS = { ...DEFAULT_SITE_SETTINGS };
+
+function applySiteSettings() {
+  const root = document.documentElement.style;
+  root.setProperty('--ink', SITE_SETTINGS.color_ink);
+  root.setProperty('--gold', SITE_SETTINGS.color_gold);
+  root.setProperty('--gold-light', SITE_SETTINGS.color_gold_light);
+  root.setProperty('--crimson', SITE_SETTINGS.color_crimson);
+  root.setProperty('--bone', SITE_SETTINGS.color_bone);
+  CONFIG.WHATSAPP_NUMBER = SITE_SETTINGS.whatsapp_number || CONFIG.WHATSAPP_NUMBER;
+  const kdFab = document.getElementById('kdWhatsappFab');
+  if (kdFab) kdFab.href = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}`;
+  document.body.classList.toggle('kd-no-anim', SITE_SETTINGS.animations_enabled === 'false');
+}
+
 const getService = (id) => SERVICES.find(s => s.id === id);
 const isOwner = (email) => email === CONFIG.ADMIN_EMAIL;
 
@@ -630,6 +660,15 @@ async function loadDynamicData() {
   try {
     const { data: ct } = await sb.from('contact_methods').select('*');
     if (ct && ct.length) CONTACTS = ct;
+  } catch (e) {}
+  try {
+    const { data: st } = await sb.from('site_settings').select('*');
+    if (st && st.length) {
+      const merged = { ...DEFAULT_SITE_SETTINGS };
+      st.forEach(row => { merged[row.key] = row.value; });
+      SITE_SETTINGS = merged;
+      applySiteSettings();
+    }
   } catch (e) {}
   try {
     const { data: ad } = await sb.from('admins').select('email');
@@ -782,10 +821,10 @@ function renderHome(main) {
       <img src="${KD_LOGO_IMAGE}" alt="KD DESIGN" class="h-full w-full object-cover"/>
     </div>
     <h1 class="font-display text-4xl md:text-6xl font-extrabold leading-tight max-w-3xl mx-auto" data-aos="fade-up" data-aos-delay="100">
-      <span class="kd-shine-text">Des idées</span> à l'image,<br/>
-      des projets à la <span class="kd-shine-text">réussite.</span>
+      <span class="kd-shine-text">${esc(SITE_SETTINGS.hero_title_1)}</span><br/>
+      ${esc(SITE_SETTINGS.hero_title_2)} <span class="kd-shine-text">${esc(SITE_SETTINGS.hero_title_3)}</span>
     </h1>
-    <p class="mx-auto mt-6 max-w-xl text-bone/65" data-aos="fade-up" data-aos-delay="200">Logos, affiches, montage vidéo, sites web et bien plus — à des prix pensés pour les entrepreneurs d'ici.</p>
+    <p class="mx-auto mt-6 max-w-xl text-bone/65" data-aos="fade-up" data-aos-delay="200">${esc(SITE_SETTINGS.hero_subtitle)}</p>
     <div class="mt-8 flex flex-wrap justify-center gap-4" data-aos="fade-up" data-aos-delay="300">
       <a href="#catalogue" class="kd-btn-primary">Voir les services</a>
       <a href="https://wa.me/${CONFIG.WHATSAPP_NUMBER}" target="_blank" class="kd-btn-secondary">💬 WhatsApp</a>
@@ -1063,16 +1102,17 @@ function renderOrderForm(main, serviceId) {
         `Paiement: ${paymentMethod}`, '', 'Détails:',
         ...s.fields.filter(f => f.type !== 'heading').map(f => `- ${f.label}: ${details[f.name] || '(non renseigné)'}`),
       ];
-      window.open(`https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join('\\n'))}`, '_blank');
+      const waLink = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join('\\n'))}`;
 
       main.innerHTML = `<div class="max-w-lg mx-auto px-5 py-20 text-center"><div class="kd-frame p-8">
         <h1 class="font-display text-xl font-bold text-gold-light">Commande envoyée ✅</h1>
-        <p class="text-sm text-bone/65 mt-2">Référence <span class="font-mono text-gold">${ref}</span>. Transmise sur WhatsApp et enregistrée sur ton tableau de bord.</p>
+        <p class="text-sm text-bone/65 mt-2">Référence <span class="font-mono text-gold">${ref}</span>. Enregistrée sur ton tableau de bord.</p>
         <div class="mt-5 rounded-lg border border-gold/30 bg-gold/5 p-4">
           <p class="kd-comic text-base text-gold-light leading-relaxed">🎉 Merci pour la confiance à KD DESIGN ! Le service que tu as commandé te sera livré dans un délai de 24 à 72h.</p>
         </div>
         <div class="mt-6 flex flex-col gap-3">
-          <a href="#/tableau-de-bord" class="kd-btn-primary">Suivre ma commande</a>
+          <a href="${waLink}" target="_blank" class="kd-btn-primary">💬 Envoyer les détails sur WhatsApp</a>
+          <a href="#/tableau-de-bord" class="kd-btn-secondary">Suivre ma commande</a>
           <a href="#/" class="kd-btn-secondary">Retour à l'accueil</a>
         </div>
       </div></div>`;
@@ -1186,6 +1226,7 @@ async function renderAdmin(main) {
       <button class="tab-btn" data-tab="commandes">Commandes</button>
       <button class="tab-btn" data-tab="stats">Statistiques</button>
       <button class="tab-btn" data-tab="historique">Historique</button>
+      <button class="tab-btn" data-tab="personnalisation">Personnalisation</button>
       <button class="tab-btn" data-tab="produits">Produits & services</button>
       <button class="tab-btn" data-tab="paiements">Moyens de paiement</button>
       <button class="tab-btn" data-tab="contacts">Contacts</button>
@@ -1206,6 +1247,7 @@ async function renderAdmin(main) {
   if (adminTab === 'commandes') return renderAdminOrders(content);
   if (adminTab === 'stats') return renderAdminStats(content);
   if (adminTab === 'historique') return renderAdminHistory(content);
+  if (adminTab === 'personnalisation') return renderAdminSettings(content);
   if (adminTab === 'produits') return renderAdminProducts(content);
   if (adminTab === 'paiements') return renderAdminPayments(content);
   if (adminTab === 'contacts') return renderAdminContacts(content);
@@ -1399,6 +1441,102 @@ function drawSalesChart(orders) {
       plugins: { legend: { labels: { color: '#e8dfce' } } }
     }
   });
+}
+
+function rgbToHex(rgbStr) {
+  const parts = (rgbStr || '0,0,0').split(',').map(n => parseInt(n.trim(), 10) || 0);
+  return '#' + parts.map(n => n.toString(16).padStart(2, '0')).join('');
+}
+function hexToRgb(hex) {
+  const h = (hex || '#000000').replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16) || 0;
+  const g = parseInt(h.substring(2, 4), 16) || 0;
+  const b = parseInt(h.substring(4, 6), 16) || 0;
+  return `${r},${g},${b}`;
+}
+
+async function renderAdminSettings(content) {
+  const s = SITE_SETTINGS;
+  content.innerHTML = `
+  <div class="kd-frame p-5">
+    <p class="font-display font-semibold mb-1">🎨 Apparence</p>
+    <p class="text-sm text-bone/55 mb-4">Change les couleurs du site en direct pour tout le monde.</p>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div><label class="kd-label">Fond principal</label><input type="color" id="set_ink" value="${rgbToHex(s.color_ink)}" class="w-full h-12 rounded-lg border-0 cursor-pointer"/></div>
+      <div><label class="kd-label">Or (principal)</label><input type="color" id="set_gold" value="${rgbToHex(s.color_gold)}" class="w-full h-12 rounded-lg border-0 cursor-pointer"/></div>
+      <div><label class="kd-label">Or clair</label><input type="color" id="set_gold_light" value="${rgbToHex(s.color_gold_light)}" class="w-full h-12 rounded-lg border-0 cursor-pointer"/></div>
+      <div><label class="kd-label">Rouge (accent)</label><input type="color" id="set_crimson" value="${rgbToHex(s.color_crimson)}" class="w-full h-12 rounded-lg border-0 cursor-pointer"/></div>
+    </div>
+    <div class="mt-4 flex items-center gap-2">
+      <input type="checkbox" id="set_anim" ${s.animations_enabled !== 'false' ? 'checked' : ''}/>
+      <label for="set_anim" class="text-sm text-bone/75">Activer les animations au défilement</label>
+    </div>
+  </div>
+
+  <div class="kd-frame p-5 mt-5">
+    <p class="font-display font-semibold mb-1">✏️ Textes de la page d'accueil</p>
+    <p class="text-sm text-bone/55 mb-4">Le grand titre (3 parties) et le sous-titre affichés en haut du site.</p>
+    <div class="flex flex-col gap-4">
+      <div><label class="kd-label">Titre — partie 1 (dorée)</label><input id="set_h1" class="kd-input" value="${esc(s.hero_title_1)}"/></div>
+      <div><label class="kd-label">Titre — partie 2</label><input id="set_h2" class="kd-input" value="${esc(s.hero_title_2)}"/></div>
+      <div><label class="kd-label">Titre — partie 3 (dorée)</label><input id="set_h3" class="kd-input" value="${esc(s.hero_title_3)}"/></div>
+      <div><label class="kd-label">Sous-titre</label><textarea id="set_sub" rows="3" class="kd-input">${esc(s.hero_subtitle)}</textarea></div>
+    </div>
+  </div>
+
+  <div class="kd-frame p-5 mt-5">
+    <p class="font-display font-semibold mb-1">📞 Contact</p>
+    <div class="mt-2"><label class="kd-label">Numéro WhatsApp (format international, sans + ni espaces)</label><input id="set_wa" class="kd-input" value="${esc(s.whatsapp_number)}" placeholder="ex: 22674128091"/></div>
+  </div>
+
+  <div class="flex gap-3 mt-6">
+    <button id="saveSettingsBtn" class="kd-btn-primary">Enregistrer les changements</button>
+    <button id="resetSettingsBtn" class="kd-btn-secondary">Réinitialiser par défaut</button>
+  </div>`;
+
+  document.getElementById('saveSettingsBtn').onclick = async () => {
+    const btn = document.getElementById('saveSettingsBtn');
+    btn.disabled = true; btn.textContent = 'Enregistrement…';
+    try {
+      const updated = {
+        color_ink: hexToRgb(document.getElementById('set_ink').value),
+        color_gold: hexToRgb(document.getElementById('set_gold').value),
+        color_gold_light: hexToRgb(document.getElementById('set_gold_light').value),
+        color_crimson: hexToRgb(document.getElementById('set_crimson').value),
+        color_bone: SITE_SETTINGS.color_bone,
+        hero_title_1: document.getElementById('set_h1').value.trim(),
+        hero_title_2: document.getElementById('set_h2').value.trim(),
+        hero_title_3: document.getElementById('set_h3').value.trim(),
+        hero_subtitle: document.getElementById('set_sub').value.trim(),
+        whatsapp_number: document.getElementById('set_wa').value.trim(),
+        animations_enabled: document.getElementById('set_anim').checked ? 'true' : 'false',
+      };
+      const rows = Object.entries(updated).map(([key, value]) => ({ key, value: String(value) }));
+      const { error } = await sb.from('site_settings').upsert(rows);
+      if (error) { alert("Erreur : " + error.message); btn.disabled = false; btn.textContent = 'Enregistrer les changements'; return; }
+      SITE_SETTINGS = { ...SITE_SETTINGS, ...updated };
+      applySiteSettings();
+      alert('Personnalisation enregistrée ✅');
+    } catch (err) {
+      alert("Erreur inattendue : " + (err && err.message ? err.message : err));
+    } finally {
+      btn.disabled = false; btn.textContent = 'Enregistrer les changements';
+    }
+  };
+
+  document.getElementById('resetSettingsBtn').onclick = async () => {
+    if (!confirm('Réinitialiser toutes les couleurs et textes par défaut ?')) return;
+    try {
+      const rows = Object.entries(DEFAULT_SITE_SETTINGS).map(([key, value]) => ({ key, value: String(value) }));
+      const { error } = await sb.from('site_settings').upsert(rows);
+      if (error) { alert("Erreur : " + error.message); return; }
+      SITE_SETTINGS = { ...DEFAULT_SITE_SETTINGS };
+      applySiteSettings();
+      renderAdminSettings(content);
+    } catch (err) {
+      alert("Erreur inattendue : " + (err && err.message ? err.message : err));
+    }
+  };
 }
 
 async function renderAdminHistory(content) {
