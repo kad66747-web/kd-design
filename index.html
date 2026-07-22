@@ -110,7 +110,9 @@ button{font-family:inherit;}
 .mb-8{margin-bottom:2rem;} .mb-10{margin-bottom:2.5rem;}
 .m-1\.5{margin:.375rem;}
 .mx-auto{margin-left:auto;margin-right:auto;}
-.h-24{height:6rem;} .w-20{width:5rem;}
+.h-24{height:6rem;} .w-20{width:5rem;} .h-20{height:5rem;}
+.w-16{width:4rem;} .h-16{height:4rem;}
+.flex-shrink-0{flex-shrink:0;}
 
 /* max widths */
 .max-w-md{max-width:28rem;} .max-w-lg{max-width:32rem;} .max-w-xl{max-width:36rem;}
@@ -921,7 +923,7 @@ function serviceCardHTML(s, i = 0) {
     </div>
     ${gallery.length ? `
     <div class="flex gap-2 overflow-x-auto pb-1">
-      ${gallery.map(src => `<img src="${src}" class="w-16 h-16 rounded-lg object-cover border border-gold/30 flex-shrink-0" loading="lazy"/>`).join('')}
+      ${gallery.map(src => `<img src="${src}" class="w-16 h-16 rounded-full object-cover border-2 border-gold/40 flex-shrink-0" loading="lazy"/>`).join('')}
     </div>
     <p class="text-xs text-gold/70 -mt-2">✓ Réalisations vérifiées</p>` : ''}
     <p class="text-sm text-bone/70">${esc(s.description)}</p>
@@ -1011,7 +1013,7 @@ function renderOrderForm(main, serviceId) {
       <div class="mt-6">
         <p class="text-center text-xs text-gold/70 mb-2">✓ Exemples de réalisations</p>
         <div class="flex gap-2 overflow-x-auto pb-1 justify-center flex-wrap">
-          ${s.gallery.map(src => `<img src="${src}" class="w-20 h-20 rounded-lg object-cover border border-gold/30"/>`).join('')}
+          ${s.gallery.map(src => `<img src="${src}" class="w-20 h-20 rounded-full object-cover border-2 border-gold/40"/>`).join('')}
         </div>
       </div>` : ''}
 
@@ -1636,7 +1638,7 @@ async function renderAdminProducts(content) {
     let galleryImages = Array.isArray(s.gallery) ? [...s.gallery] : [];
     const galleryThumbsHTML = () => galleryImages.map((src, idx) => `
       <div class="relative flex-shrink-0" data-gidx="${idx}">
-        <img src="${src}" class="w-16 h-16 rounded-lg object-cover border border-gold/30"/>
+        <img src="${src}" class="w-16 h-16 rounded-full object-cover border-2 border-gold/40"/>
         <button type="button" class="galDelBtn absolute -top-2 -right-2 bg-crimson text-white rounded-full w-5 h-5 text-xs leading-none">✕</button>
       </div>`).join('');
     const formHtml = `
