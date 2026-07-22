@@ -787,7 +787,7 @@ function navbarHTML() {
       ${currentUser ? `
         <a href="#/${isAdmin ? 'admin' : 'tableau-de-bord'}" class="${isAccount ? 'text-gold' : 'text-bone/80'}">${isAdmin ? 'Admin' : 'Mes commandes'}</a>
         <button id="logoutBtnMobile" class="text-crimson-light">Déconnexion</button>
-      ` : `<a href="#/connexion" class="text-gold">Connexion</a>`}
+      ` : `<a href="#/connexion" class="kd-btn-primary !py-2 text-sm !w-auto mt-1" style="align-self:flex-start;">Connexion</a>`}
     </div>
   </header>`;
 }
@@ -954,54 +954,6 @@ function renderLogin(main) {
     const password = fd.get('password');
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) { const p = document.getElementById('loginError'); p.textContent = 'Email ou mot de passe incorrect.'; p.classList.remove('hidden'); return; }
-
-    // Vérifie si ce compte est admin (propriétaire ou associé) : dans ce cas, exige un code de confirmation
-    let isAdminEmail = (email === CONFIG.ADMIN_EMAIL);
-    if (!isAdminEmail) {
-      try {
-        const { data: ad } = await sb.from('admins').select('email').eq('email', email);
-        isAdminEmail = !!(ad && ad.length);
-      } catch (_) {}
-    }
-
-    if (isAdminEmail) {
-      await sb.auth.signOut();
-      const { error: otpErr } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
-      if (otpErr) { const p = document.getElementById('loginError'); p.textContent = "Impossible d'envoyer le code de confirmation. Réessaie."; p.classList.remove('hidden'); return; }
-      renderLoginOtp(main, email);
-      return;
-    }
-
-    await refreshUser();
-    if (data?.user) sb.from('logins').insert({ user_id: data.user.id }).then(()=>{}).catch(()=>{});
-    location.hash = '#/';
-  };
-}
-
-// ---------- CODE DE CONFIRMATION (admin uniquement) ----------
-function renderLoginOtp(main, email) {
-  main.innerHTML = `
-  <div class="max-w-md mx-auto px-5 py-16">
-    <div class="kd-card p-8">
-      <h1 class="font-display text-2xl font-bold">Code de confirmation</h1>
-      <p class="text-sm text-bone/55 mt-1">Compte admin détecté. Un code à 6 chiffres a été envoyé à <span class="text-gold">${esc(email)}</span>.</p>
-      <form id="otpForm" class="mt-6 flex flex-col gap-4">
-        <div><label class="kd-label">Code reçu par email</label><input required inputmode="numeric" pattern="[0-9]*" maxlength="6" name="token" class="kd-input tracking-widest text-center text-xl" placeholder="000000"/></div>
-        <p id="otpError" class="text-sm text-crimson-light hidden"></p>
-        <button type="submit" class="kd-btn-primary mt-2">Confirmer</button>
-      </form>
-      <p class="text-center text-sm text-bone/55 mt-5"><button type="button" id="cancelOtpBtn" class="text-gold hover:underline bg-transparent border-0 p-0 cursor-pointer">Annuler et revenir à la connexion</button></p>
-    </div>
-  </div>`;
-
-  document.getElementById('cancelOtpBtn').onclick = () => renderLogin(main);
-
-  document.getElementById('otpForm').onsubmit = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const token = fd.get('token');
-    const { data, error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
-    if (error) { const p = document.getElementById('otpError'); p.textContent = 'Code invalide ou expiré.'; p.classList.remove('hidden'); return; }
     await refreshUser();
     if (data?.user) sb.from('logins').insert({ user_id: data.user.id }).then(()=>{}).catch(()=>{});
     location.hash = '#/';
